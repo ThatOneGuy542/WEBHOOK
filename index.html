@@ -1,0 +1,807 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Webhook Sender</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --primary: #000000;
+            --primary-dark: #333333;
+            --dark: #000000;
+            --light: #FFFFFF;
+            --success: #000000;
+            --warning: #555555;
+            --danger: #000000;
+            --gray: #888888;
+            --gray-light: #f0f0f0;
+            --border: #e0e0e0;
+            --shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+            --discord-blurple: #5865F2;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+        }
+
+        body {
+            background-color: #111111;
+            color: #FFFFFF;
+            line-height: 1.6;
+            padding: 0;
+            min-height: 100vh;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 40px;
+        }
+
+        header {
+            text-align: center;
+            margin-bottom: 48px;
+            border-bottom: 1px solid #333;
+            padding-bottom: 20px;
+            position: relative;
+        }
+
+        h1 {
+            font-size: 2.5rem;
+            font-weight: 700;
+            color: var(--light);
+            margin-bottom: 16px;
+            letter-spacing: 1px;
+        }
+
+        h1 i {
+            color: var(--light);
+            margin-right: 12px;
+        }
+
+        .subtitle {
+            font-size: 1.1rem;
+            color: #AAAAAA;
+            max-width: 700px;
+            margin: 0 auto;
+            font-weight: 300;
+        }
+
+        .join-community {
+            position: absolute;
+            top: 0;
+            right: 0;
+        }
+
+        .join-community .btn {
+            background-color: var(--discord-blurple);
+            border: none;
+        }
+
+        .join-community .btn:hover {
+            background-color: #4752c4;
+        }
+
+        .card {
+            background-color: #222222;
+            border-radius: 12px;
+            box-shadow: var(--shadow);
+            padding: 32px;
+            margin-bottom: 32px;
+            border: 1px solid #333;
+        }
+
+        h2 {
+            font-size: 1.5rem;
+            font-weight: 600;
+            color: var(--light);
+            margin-bottom: 24px;
+            display: flex;
+            align-items: center;
+        }
+
+        h2 i {
+            margin-right: 12px;
+            color: var(--light);
+            font-size: 1.3rem;
+        }
+
+        .form-row {
+            display: flex;
+            gap: 20px;
+            margin-bottom: 20px;
+            flex-wrap: wrap;
+        }
+
+        .form-group {
+            flex: 1;
+            min-width: 300px;
+        }
+
+        label {
+            display: block;
+            font-weight: 500;
+            margin-bottom: 8px;
+            color: #DDDDDD;
+            font-size: 0.95rem;
+        }
+
+        input, textarea, select {
+            width: 100%;
+            padding: 14px 16px;
+            border: 1px solid #444;
+            border-radius: 8px;
+            font-size: 1rem;
+            transition: all 0.2s;
+            background-color: #333;
+            color: white;
+        }
+
+        input:focus, textarea:focus, select:focus {
+            outline: none;
+            border-color: #666;
+            box-shadow: 0 0 0 3px rgba(100, 100, 100, 0.1);
+        }
+
+        textarea {
+            min-height: 150px;
+            resize: vertical;
+            line-height: 1.5;
+        }
+
+        #webhook-url {
+            min-height: 150px;
+            resize: vertical;
+            line-height: 1.5;
+            font-family: monospace;
+            white-space: pre;
+        }
+
+        select {
+            min-height: 150px;
+        }
+
+        .btn {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            background-color: #000;
+            color: white;
+            border: none;
+            padding: 14px 24px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: 500;
+            font-size: 1rem;
+            transition: all 0.2s;
+            border: 1px solid #444;
+            text-decoration: none;
+        }
+
+        .btn:hover {
+            background-color: #111;
+            transform: translateY(-1px);
+        }
+
+        .btn i {
+            margin-right: 8px;
+        }
+
+        .btn-danger {
+            background-color: #000;
+            border: 1px solid #444;
+        }
+
+        .btn-danger:hover {
+            background-color: #111;
+        }
+
+        .btn-secondary {
+            background-color: #333;
+            border: 1px solid #555;
+        }
+
+        .btn-secondary:hover {
+            background-color: #444;
+        }
+
+        .webhook-list {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
+            gap: 16px;
+            margin-top: 24px;
+        }
+
+        .webhook-item {
+            background-color: #2a2a2a;
+            padding: 20px;
+            border-radius: 8px;
+            border: 1px solid #444;
+            display: flex;
+            flex-direction: column;
+            transition: all 0.2s;
+        }
+
+        .webhook-item:hover {
+            transform: translateY(-2px);
+            box-shadow: var(--shadow);
+            border-color: #666;
+        }
+
+        .webhook-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 12px;
+        }
+
+        .webhook-name {
+            font-weight: 600;
+            font-size: 1.1rem;
+            color: var(--light);
+        }
+
+        .webhook-url {
+            font-size: 0.9rem;
+            color: #999;
+            word-break: break-all;
+            margin-bottom: 16px;
+            background-color: #333;
+            padding: 10px;
+            border-radius: 6px;
+            font-family: monospace;
+        }
+
+        .webhook-actions {
+            display: flex;
+            gap: 10px;
+            margin-top: auto;
+        }
+
+        .webhook-actions .btn {
+            flex: 1;
+            padding: 10px;
+            font-size: 0.9rem;
+        }
+
+        .select-actions {
+            display: flex;
+            gap: 12px;
+            margin-top: 12px;
+        }
+
+        .select-actions .btn {
+            flex: 1;
+        }
+
+        .response-log {
+            background-color: #222;
+            padding: 20px;
+            border-radius: 8px;
+            border: 1px solid #444;
+            max-height: 400px;
+            overflow-y: auto;
+        }
+
+        .response-item {
+            padding: 16px;
+            margin-bottom: 12px;
+            border-radius: 8px;
+            border-left: 4px solid #666;
+            background-color: #2a2a2a;
+        }
+
+        .response-item.success {
+            border-left-color: #000;
+            background-color: rgba(0, 0, 0, 0.2);
+        }
+
+        .response-item.error {
+            border-left-color: #000;
+            background-color: rgba(50, 50, 50, 0.2);
+        }
+
+        .response-content {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .response-message {
+            font-weight: 500;
+        }
+
+        .response-time {
+            font-size: 0.85rem;
+            color: #999;
+        }
+
+        .empty-state {
+            text-align: center;
+            padding: 40px;
+            color: #777;
+        }
+
+        .empty-state i {
+            font-size: 2rem;
+            margin-bottom: 16px;
+            color: #555;
+        }
+
+        .webhook-input-hint {
+            color: #999;
+            font-size: 0.85rem;
+            margin-top: 5px;
+        }
+
+        .spam-controls {
+            display: flex;
+            gap: 20px;
+            margin-bottom: 20px;
+        }
+
+        .spam-control {
+            flex: 1;
+        }
+
+        @media (max-width: 768px) {
+            .container {
+                padding: 24px;
+            }
+            
+            h1 {
+                font-size: 2rem;
+            }
+            
+            .card {
+                padding: 24px;
+            }
+            
+            .webhook-list {
+                grid-template-columns: 1fr;
+            }
+            
+            .form-group {
+                min-width: 100%;
+            }
+
+            .spam-controls {
+                flex-direction: column;
+                gap: 10px;
+            }
+
+            .join-community {
+                position: static;
+                margin-bottom: 20px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <div class="join-community">
+                <a href="https://discord.gg/tQrz6hFh4W" class="btn" target="_blank">
+                    <i class="fab fa-discord"></i> Join Our Community
+                </a>
+            </div>
+            <h1><i class="fas fa-code"></i> Webhook Sender</h1>
+            <p class="subtitle">Professional webhook management system with rate control</p>
+        </header>
+        
+        <div class="card">
+            <h2><i class="fas fa-link"></i> Webhook Management</h2>
+            <div class="form-group">
+                <label for="webhook-name">Webhook Name (optional, will apply to all below)</label>
+                <input type="text" id="webhook-name" placeholder="e.g. Marketing Channel">
+            </div>
+            <div class="form-group">
+                <label for="webhook-url">Webhook URLs (one per line)</label>
+                <textarea id="webhook-url" placeholder="https://discord.com/api/webhooks/...
+https://discord.com/api/webhooks/...
+https://discord.com/api/webhooks/..."></textarea>
+                <div class="webhook-input-hint">Enter one webhook URL per line</div>
+            </div>
+            <button id="add-webhook" class="btn"><i class="fas fa-plus"></i> Add All Webhooks</button>
+            
+            <div id="webhook-list-container">
+                <h3 style="margin-top: 32px; margin-bottom: 16px; color: #DDD;">Saved Webhooks</h3>
+                <div id="webhook-list" class="webhook-list"></div>
+            </div>
+        </div>
+        
+        <div class="card">
+            <h2><i class="fas fa-paper-plane"></i> Send Message</h2>
+            <div class="form-group">
+                <label for="username">Custom Username (optional)</label>
+                <input type="text" id="username" placeholder="Override the default webhook username">
+            </div>
+            <div class="form-group">
+                <label for="avatar-url">Avatar URL (optional)</label>
+                <input type="url" id="avatar-url" placeholder="https://example.com/avatar.png">
+            </div>
+            <div class="form-group">
+                <label for="message-content">Message Content</label>
+                <textarea id="message-content" placeholder="Enter your message here... Markdown and embeds are supported" required></textarea>
+            </div>
+            
+            <div class="spam-controls">
+                <div class="form-group spam-control">
+                    <label for="message-count">Number of Messages to Send</label>
+                    <input type="number" id="message-count" min="1" value="1" placeholder="How many times to send">
+                </div>
+                <div class="form-group spam-control">
+                    <label for="cooldown">Cooldown Between Messages (ms)</label>
+                    <input type="number" id="cooldown" min="0" value="1000" placeholder="Milliseconds between sends">
+                </div>
+            </div>
+            
+            <div class="form-group">
+                <label for="selected-webhooks">Select Webhooks</label>
+                <select id="selected-webhooks" multiple>
+                    <!-- Webhooks will be added here dynamically -->
+                </select>
+                <div class="select-actions">
+                    <button id="select-all" class="btn btn-secondary"><i class="fas fa-check-square"></i> Select All</button>
+                    <button id="deselect-all" class="btn btn-secondary"><i class="fas fa-times-circle"></i> Deselect All</button>
+                </div>
+            </div>
+            <button id="send-message" class="btn"><i class="fas fa-paper-plane"></i> Send Message</button>
+        </div>
+        
+        <div class="card">
+            <h2><i class="fas fa-history"></i> Activity Log</h2>
+            <div id="response-log" class="response-log">
+                <div class="empty-state">
+                    <i class="fas fa-history"></i>
+                    <h3>No activity logging</h3>
+                    <p>Activity logging has been disabled</p>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            // DOM Elements
+            const webhookNameInput = document.getElementById('webhook-name');
+            const webhookUrlInput = document.getElementById('webhook-url');
+            const addWebhookBtn = document.getElementById('add-webhook');
+            const webhookList = document.getElementById('webhook-list');
+            const webhookListContainer = document.getElementById('webhook-list-container');
+            const usernameInput = document.getElementById('username');
+            const avatarUrlInput = document.getElementById('avatar-url');
+            const messageContentInput = document.getElementById('message-content');
+            const messageCountInput = document.getElementById('message-count');
+            const cooldownInput = document.getElementById('cooldown');
+            const selectedWebhooksSelect = document.getElementById('selected-webhooks');
+            const selectAllBtn = document.getElementById('select-all');
+            const deselectAllBtn = document.getElementById('deselect-all');
+            const sendMessageBtn = document.getElementById('send-message');
+            const responseLog = document.getElementById('response-log');
+            
+            // Load saved webhooks from localStorage
+            let webhooks = JSON.parse(localStorage.getItem('discordWebhooks')) || [];
+            
+            // Initialize the app
+            function init() {
+                renderWebhookList();
+                updateWebhookSelect();
+                
+                // Set up empty states
+                checkEmptyStates();
+            }
+            
+            // Render the webhook list
+            function renderWebhookList() {
+                webhookList.innerHTML = '';
+                
+                if (webhooks.length === 0) {
+                    const emptyState = document.createElement('div');
+                    emptyState.className = 'empty-state';
+                    emptyState.innerHTML = `
+                        <i class="fas fa-inbox"></i>
+                        <h3>No webhooks saved</h3>
+                        <p>Add your first webhook using the form above</p>
+                    `;
+                    webhookList.appendChild(emptyState);
+                    return;
+                }
+                
+                webhooks.forEach((webhook, index) => {
+                    const webhookItem = document.createElement('div');
+                    webhookItem.className = 'webhook-item';
+                    
+                    webhookItem.innerHTML = `
+                        <div class="webhook-header">
+                            <div class="webhook-name">${webhook.name || 'Unnamed Webhook'}</div>
+                        </div>
+                        <div class="webhook-url" title="${webhook.url}">${webhook.url}</div>
+                        <div class="webhook-actions">
+                            <button class="btn btn-secondary test-btn" data-index="${index}">
+                                <i class="fas fa-test-tube"></i> Test
+                            </button>
+                            <button class="btn btn-danger delete-btn" data-index="${index}">
+                                <i class="fas fa-trash"></i> Delete
+                            </button>
+                        </div>
+                    `;
+                    
+                    webhookList.appendChild(webhookItem);
+                });
+                
+                // Add event listeners to delete buttons
+                document.querySelectorAll('.delete-btn').forEach(btn => {
+                    btn.addEventListener('click', function() {
+                        const index = parseInt(this.getAttribute('data-index'));
+                        deleteWebhook(index);
+                    });
+                });
+                
+                // Add event listeners to test buttons
+                document.querySelectorAll('.test-btn').forEach(btn => {
+                    btn.addEventListener('click', function() {
+                        const index = parseInt(this.getAttribute('data-index'));
+                        testWebhook(index);
+                    });
+                });
+            }
+            
+            // Update the webhook select dropdown
+            function updateWebhookSelect() {
+                selectedWebhooksSelect.innerHTML = '';
+                
+                webhooks.forEach((webhook, index) => {
+                    const option = document.createElement('option');
+                    option.value = index;
+                    option.textContent = webhook.name || `Webhook ${index + 1}`;
+                    selectedWebhooksSelect.appendChild(option);
+                });
+            }
+            
+            // Add multiple webhooks
+            function addWebhooks() {
+                const name = webhookNameInput.value.trim();
+                const urlsInput = webhookUrlInput.value.trim();
+                
+                if (!urlsInput) {
+                    showAlert('Please enter at least one webhook URL', 'error');
+                    return;
+                }
+                
+                // Split by newlines and trim each URL
+                const urlStrings = urlsInput.split('\n')
+                    .map(url => url.trim())
+                    .filter(url => url.length > 0);
+                
+                if (urlStrings.length === 0) {
+                    showAlert('Please enter valid webhook URLs (one per line)', 'error');
+                    return;
+                }
+                
+                let addedCount = 0;
+                
+                urlStrings.forEach(url => {
+                    // Validate URL (simple check)
+                    if (!url.startsWith('https://discord.com/api/webhooks/')) {
+                        showAlert(`Skipping invalid URL: ${url}`, 'error');
+                        return;
+                    }
+                    
+                    const newWebhook = { name, url };
+                    webhooks.push(newWebhook);
+                    addedCount++;
+                });
+                
+                if (addedCount > 0) {
+                    saveWebhooks();
+                    
+                    // Clear inputs
+                    webhookUrlInput.value = '';
+                    
+                    // Update UI
+                    renderWebhookList();
+                    updateWebhookSelect();
+                    checkEmptyStates();
+                    
+                    showAlert(`Added ${addedCount} webhook(s) successfully!`, 'success');
+                }
+            }
+            
+            // Delete a webhook
+            function deleteWebhook(index) {
+                if (confirm('Are you sure you want to delete this webhook?')) {
+                    webhooks.splice(index, 1);
+                    saveWebhooks();
+                    renderWebhookList();
+                    updateWebhookSelect();
+                    checkEmptyStates();
+                    
+                    showAlert('Webhook deleted', 'success');
+                }
+            }
+            
+            // Test a webhook
+            function testWebhook(index) {
+                const webhook = webhooks[index];
+                const payload = {
+                    content: 'This is a test message from Webhook Sender',
+                    username: 'Webhook Tester',
+                    avatar_url: 'https://cdn.discordapp.com/emojis/848931236986454026.png'
+                };
+                
+                sendWebhook(webhook.url, payload);
+            }
+            
+            // Save webhooks to localStorage
+            function saveWebhooks() {
+                localStorage.setItem('discordWebhooks', JSON.stringify(webhooks));
+            }
+            
+            // Send message to selected webhooks
+            async function sendMessage() {
+                const selectedOptions = Array.from(selectedWebhooksSelect.selectedOptions);
+                const selectedIndices = selectedOptions.map(option => parseInt(option.value));
+                
+                if (selectedIndices.length === 0) {
+                    showAlert('Please select at least one webhook', 'error');
+                    return;
+                }
+                
+                const message = messageContentInput.value.trim();
+                if (!message) {
+                    showAlert('Please enter a message', 'error');
+                    return;
+                }
+                
+                const messageCount = parseInt(messageCountInput.value) || 1;
+                const cooldown = parseInt(cooldownInput.value) || 1000;
+                
+                if (messageCount < 1) {
+                    showAlert('Message count must be at least 1', 'error');
+                    return;
+                }
+                
+                if (cooldown < 0) {
+                    showAlert('Cooldown cannot be negative', 'error');
+                    return;
+                }
+                
+                const username = usernameInput.value.trim();
+                const avatarUrl = avatarUrlInput.value.trim();
+                
+                const payload = {
+                    content: message
+                };
+                
+                if (username) payload.username = username;
+                if (avatarUrl) payload.avatar_url = avatarUrl;
+                
+                // Disable send button during sending
+                sendMessageBtn.disabled = true;
+                sendMessageBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Sending...';
+                
+                try {
+                    // Send multiple times with cooldown
+                    for (let i = 0; i < messageCount; i++) {
+                        if (i > 0) {
+                            // Show progress for subsequent messages
+                            sendMessageBtn.innerHTML = `<i class="fas fa-spinner fa-spin"></i> Sending (${i+1}/${messageCount})...`;
+                            
+                            // Wait for cooldown between messages
+                            await new Promise(resolve => setTimeout(resolve, cooldown));
+                        }
+                        
+                        // Send to each selected webhook
+                        const promises = selectedIndices.map(index => {
+                            const webhook = webhooks[index];
+                            return sendWebhook(webhook.url, payload);
+                        });
+                        
+                        await Promise.all(promises);
+                    }
+                    
+                    showAlert(`Successfully sent ${messageCount} message(s) to ${selectedIndices.length} webhook(s)`, 'success');
+                } catch (error) {
+                    showAlert(`Completed with some errors: ${error.message}`, 'error');
+                } finally {
+                    sendMessageBtn.disabled = false;
+                    sendMessageBtn.innerHTML = '<i class="fas fa-paper-plane"></i> Send Message';
+                }
+            }
+            
+            // Send a webhook request
+            function sendWebhook(url, payload) {
+                return fetch(url, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(payload)
+                })
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error(`HTTP error! status: ${response.status}`);
+                    }
+                    return response;
+                })
+                .catch(error => {
+                    throw error;
+                });
+            }
+            
+            // Show a temporary alert
+            function showAlert(message, type) {
+                const alert = document.createElement('div');
+                alert.className = `response-item ${type}`;
+                alert.style.position = 'fixed';
+                alert.style.top = '20px';
+                alert.style.right = '20px';
+                alert.style.zIndex = '1000';
+                alert.style.maxWidth = '400px';
+                alert.style.boxShadow = '0 4px 12px rgba(0,0,0,0.3)';
+                
+                alert.innerHTML = `
+                    <div class="response-content">
+                        <div class="response-message">${message}</div>
+                    </div>
+                `;
+                
+                document.body.appendChild(alert);
+                
+                // Remove after 3 seconds
+                setTimeout(() => {
+                    alert.style.opacity = '0';
+                    alert.style.transition = 'opacity 0.5s';
+                    setTimeout(() => {
+                        document.body.removeChild(alert);
+                    }, 500);
+                }, 3000);
+            }
+            
+            // Check and handle empty states
+            function checkEmptyStates() {
+                // Remove any existing empty states
+                const existingEmptyStates = document.querySelectorAll('.empty-state');
+                existingEmptyStates.forEach(el => el.remove());
+                
+                // Check webhooks
+                if (webhooks.length === 0) {
+                    const emptyState = document.createElement('div');
+                    emptyState.className = 'empty-state';
+                    emptyState.innerHTML = `
+                        <i class="fas fa-inbox"></i>
+                        <h3>No webhooks saved</h3>
+                        <p>Add your first webhook using the form above</p>
+                    `;
+                    webhookList.appendChild(emptyState);
+                }
+            }
+            
+            // Event listeners
+            addWebhookBtn.addEventListener('click', addWebhooks);
+            sendMessageBtn.addEventListener('click', sendMessage);
+            
+            selectAllBtn.addEventListener('click', function() {
+                Array.from(selectedWebhooksSelect.options).forEach(option => {
+                    option.selected = true;
+                });
+            });
+            
+            deselectAllBtn.addEventListener('click', function() {
+                Array.from(selectedWebhooksSelect.options).forEach(option => {
+                    option.selected = false;
+                });
+            });
+            
+            // Initialize the app
+            init();
+        });
+    </script>
+</body>
+</html>
