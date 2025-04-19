@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Webhook Sender</title>
+    <title>Ultimate Webhook Sender</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <style>
@@ -465,10 +465,10 @@
         <header>
             <div class="join-community">
                 <a href="https://discord.gg/tQrz6hFh4W" class="btn" target="_blank">
-                    <i class="fab fa-discord"></i> Join Our Community
+                    <i class="fas fa-discord"></i> Join Our Community
                 </a>
             </div>
-            <h1><i class="fas fa-code"></i> Webhook Sender</h1>
+            <h1><i class="fas fa-code"></i> Ultimate Webhook Sender</h1>
             <p class="subtitle">Professional webhook management system with rate control</p>
         </header>
         
@@ -763,7 +763,7 @@ https://discord.com/api/webhooks/..."></textarea>
             function testWebhook(index) {
                 const webhook = webhooks[index];
                 const payload = {
-                    content: 'This is a test message from Webhook Sender',
+                    content: 'This is a test message from Ultimate Webhook Sender',
                     username: 'Webhook Tester',
                     avatar_url: 'https://cdn.discordapp.com/emojis/848931236986454026.png'
                 };
@@ -805,24 +805,12 @@ https://discord.com/api/webhooks/..."></textarea>
                 const messageCount = parseInt(messageCountInput.value) || 1;
                 const cooldown = parseInt(cooldownInput.value) || 1000;
                 
-                if (messageCount < 1) {
-                    showAlert('Message count must be at least 1', 'error');
-                    return;
-                }
-                
-                if (cooldown < 0) {
-                    showAlert('Cooldown cannot be negative', 'error');
-                    return;
-                }
-                
-                // Disable send button during sending
                 sendMessageBtn.disabled = true;
                 sendMessageBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Sending...';
                 
                 try {
                     let successfulSends = 0;
                     let failedSends = 0;
-                    const totalAttempts = selectedIndices.length * messageCount;
                     
                     logActivity(`Starting to send ${messageCount} message(s) to ${selectedIndices.length} webhook(s)`, 'info');
                     
@@ -835,27 +823,23 @@ https://discord.com/api/webhooks/..."></textarea>
                             await new Promise(resolve => setTimeout(resolve, cooldown));
                         }
                         
-                        // Create fresh payload for each message
                         const payload = {
                             content: message,
                             ...(username && { username }),
                             ...(avatarUrl && { avatar_url: avatarUrl })
                         };
                         
-                        // Send to each webhook in parallel
-                        const results = await Promise.allSettled(
-                            selectedIndices.map(async (index) => {
-                                const webhook = webhooks[index];
-                                try {
-                                    await sendWebhook(webhook.url, payload);
-                                    successfulSends++;
-                                    logActivity(`Message ${i+1} sent to ${webhook.name || 'Unnamed'}`, 'success');
-                                } catch (error) {
-                                    failedSends++;
-                                    logActivity(`Failed to send to ${webhook.name || 'Unnamed'}: ${error.message}`, 'error');
-                                }
-                            })
-                        );
+                        for (const index of selectedIndices) {
+                            const webhook = webhooks[index];
+                            try {
+                                await sendWebhook(webhook.url, payload);
+                                successfulSends++;
+                                logActivity(`Message ${i+1} sent to ${webhook.name || 'Unnamed'}`, 'success');
+                            } catch (error) {
+                                failedSends++;
+                                logActivity(`Failed to send to ${webhook.name || 'Unnamed'}: ${error.message}`, 'error');
+                            }
+                        }
                     }
                     
                     const resultMessage = `Completed: ${successfulSends} successful, ${failedSends} failed`;
@@ -871,8 +855,9 @@ https://discord.com/api/webhooks/..."></textarea>
                 }
             }
             
-            // Send a webhook request with proper error handling
+            // Send a webhook request using multiple methods
             async function sendWebhook(url, payload) {
+                // Method 1: Try Fetch API first
                 try {
                     const response = await fetch(url, {
                         method: 'POST',
@@ -881,23 +866,66 @@ https://discord.com/api/webhooks/..."></textarea>
                         },
                         body: JSON.stringify(payload)
                     });
-                    
+
                     if (!response.ok) {
-                        let errorMessage = `HTTP error! Status: ${response.status}`;
-                        try {
-                            const errorData = await response.json();
-                            if (errorData.message) {
-                                errorMessage = errorData.message;
-                            }
-                        } catch (e) {
-                            // Couldn't parse JSON error response
-                        }
-                        throw new Error(errorMessage);
+                        throw new Error(`HTTP error! Status: ${response.status}`);
                     }
-                    
+
                     return await response.json();
-                } catch (error) {
-                    throw new Error(`Failed to send: ${error.message}`);
+                } catch (fetchError) {
+                    // Method 2: Fallback to XHR if Fetch fails
+                    try {
+                        return await new Promise((resolve, reject) => {
+                            const xhr = new XMLHttpRequest();
+                            xhr.open('POST', url, true);
+                            xhr.setRequestHeader('Content-Type', 'application/json');
+                            
+                            xhr.onload = function() {
+                                if (xhr.status >= 200 && xhr.status < 300) {
+                                    resolve(JSON.parse(xhr.responseText));
+                                } else {
+                                    reject(new Error(`XHR error: ${xhr.status}`));
+                                }
+                            };
+                            
+                            xhr.onerror = function() {
+                                reject(new Error('XHR network error'));
+                            };
+                            
+                            xhr.send(JSON.stringify(payload));
+                        });
+                    } catch (xhrError) {
+                        // Method 3: Final fallback to iframe method
+                        try {
+                            return await new Promise((resolve, reject) => {
+                                const iframe = document.createElement('iframe');
+                                iframe.style.display = 'none';
+                                document.body.appendChild(iframe);
+                                
+                                const form = document.createElement('form');
+                                form.method = 'POST';
+                                form.action = url;
+                                form.target = iframe.name || '_blank';
+                                
+                                const input = document.createElement('input');
+                                input.type = 'hidden';
+                                input.name = 'payload_json';
+                                input.value = JSON.stringify(payload);
+                                form.appendChild(input);
+                                
+                                document.body.appendChild(form);
+                                form.submit();
+                                
+                                setTimeout(() => {
+                                    document.body.removeChild(form);
+                                    document.body.removeChild(iframe);
+                                    resolve({ status: 'success' });
+                                }, 3000);
+                            });
+                        } catch (iframeError) {
+                            throw new Error(`All methods failed: ${iframeError.message}`);
+                        }
+                    }
                 }
             }
             
