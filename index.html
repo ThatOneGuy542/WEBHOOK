@@ -557,7 +557,6 @@ https://discord.com/api/webhooks/..."></textarea>
             const webhookUrlInput = document.getElementById('webhook-url');
             const addWebhookBtn = document.getElementById('add-webhook');
             const webhookList = document.getElementById('webhook-list');
-            const webhookListContainer = document.getElementById('webhook-list-container');
             const usernameInput = document.getElementById('username');
             const avatarUrlInput = document.getElementById('avatar-url');
             const messageContentInput = document.getElementById('message-content');
@@ -578,8 +577,6 @@ https://discord.com/api/webhooks/..."></textarea>
             function init() {
                 renderWebhookList();
                 updateWebhookSelect();
-                
-                // Set up empty states
                 checkEmptyStates();
             }
             
@@ -602,7 +599,6 @@ https://discord.com/api/webhooks/..."></textarea>
                 webhooks.forEach((webhook, index) => {
                     const webhookItem = document.createElement('div');
                     webhookItem.className = 'webhook-item';
-                    
                     webhookItem.innerHTML = `
                         <div class="webhook-header">
                             <div class="webhook-name">${webhook.name || 'Unnamed Webhook'}</div>
@@ -617,11 +613,10 @@ https://discord.com/api/webhooks/..."></textarea>
                             </button>
                         </div>
                     `;
-                    
                     webhookList.appendChild(webhookItem);
                 });
                 
-                // Add event listeners to delete buttons
+                // Add event listeners to buttons
                 document.querySelectorAll('.delete-btn').forEach(btn => {
                     btn.addEventListener('click', function() {
                         const index = parseInt(this.getAttribute('data-index'));
@@ -629,7 +624,6 @@ https://discord.com/api/webhooks/..."></textarea>
                     });
                 });
                 
-                // Add event listeners to test buttons
                 document.querySelectorAll('.test-btn').forEach(btn => {
                     btn.addEventListener('click', function() {
                         const index = parseInt(this.getAttribute('data-index'));
@@ -641,7 +635,6 @@ https://discord.com/api/webhooks/..."></textarea>
             // Update the webhook select dropdown
             function updateWebhookSelect() {
                 selectedWebhooksSelect.innerHTML = '';
-                
                 webhooks.forEach((webhook, index) => {
                     const option = document.createElement('option');
                     option.value = index;
@@ -671,7 +664,6 @@ https://discord.com/api/webhooks/..."></textarea>
                     return;
                 }
                 
-                // Split by newlines and trim each URL
                 const urlStrings = urlsInput.split('\n')
                     .map(url => url.trim())
                     .filter(url => url.length > 0);
@@ -685,14 +677,12 @@ https://discord.com/api/webhooks/..."></textarea>
                 let invalidCount = 0;
                 
                 urlStrings.forEach(url => {
-                    // Validate URL
                     if (!isValidDiscordWebhook(url)) {
                         logActivity(`Invalid webhook URL: ${url}`, 'error');
                         invalidCount++;
                         return;
                     }
                     
-                    // Check for duplicates
                     if (webhooks.some(wh => wh.url === url)) {
                         logActivity(`Webhook already exists: ${url}`, 'warning');
                         return;
@@ -706,11 +696,7 @@ https://discord.com/api/webhooks/..."></textarea>
                 
                 if (addedCount > 0 || invalidCount > 0) {
                     saveWebhooks();
-                    
-                    // Clear inputs
                     webhookUrlInput.value = '';
-                    
-                    // Update UI
                     renderWebhookList();
                     updateWebhookSelect();
                     checkEmptyStates();
@@ -732,7 +718,6 @@ https://discord.com/api/webhooks/..."></textarea>
                     renderWebhookList();
                     updateWebhookSelect();
                     checkEmptyStates();
-                    
                     logActivity(`Deleted webhook: ${deletedWebhook.name || 'Unnamed'} (${deletedWebhook.url})`, 'info');
                     showAlert('Webhook deleted', 'success');
                 }
@@ -752,7 +737,6 @@ https://discord.com/api/webhooks/..."></textarea>
                     renderWebhookList();
                     updateWebhookSelect();
                     checkEmptyStates();
-                    
                     showAlert('All webhooks deleted', 'success');
                 }
             }
@@ -831,63 +815,56 @@ https://discord.com/api/webhooks/..."></textarea>
                     return;
                 }
                 
-                const username = usernameInput.value.trim();
-                const avatarUrl = avatarUrlInput.value.trim();
-                
-                const payload = {
-                    content: message
-                };
-                
-                if (username) payload.username = username;
-                if (avatarUrl) payload.avatar_url = avatarUrl;
-                
                 // Disable send button during sending
                 sendMessageBtn.disabled = true;
                 sendMessageBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Sending...';
                 
                 try {
-                    // Log start of sending
-                    logActivity(`Starting to send ${messageCount} message(s) to ${selectedIndices.length} webhook(s)`, 'info');
-                    
                     let successfulSends = 0;
                     let failedSends = 0;
+                    const totalAttempts = selectedIndices.length * messageCount;
                     
-                    // Send multiple times with cooldown
+                    logActivity(`Starting to send ${messageCount} message(s) to ${selectedIndices.length} webhook(s)`, 'info');
+                    
+                    const username = usernameInput.value.trim();
+                    const avatarUrl = avatarUrlInput.value.trim();
+                    
                     for (let i = 0; i < messageCount; i++) {
                         if (i > 0) {
-                            // Show progress for subsequent messages
                             sendMessageBtn.innerHTML = `<i class="fas fa-spinner fa-spin"></i> Sending (${i+1}/${messageCount})...`;
-                            
-                            // Wait for cooldown between messages
                             await new Promise(resolve => setTimeout(resolve, cooldown));
                         }
                         
-                        // Send to each selected webhook
+                        // Create fresh payload for each message
+                        const payload = {
+                            content: message,
+                            ...(username && { username }),
+                            ...(avatarUrl && { avatar_url: avatarUrl })
+                        };
+                        
+                        // Send to each webhook in parallel
                         const results = await Promise.allSettled(
-                            selectedIndices.map(index => {
+                            selectedIndices.map(async (index) => {
                                 const webhook = webhooks[index];
-                                return sendWebhook(webhook.url, payload)
-                                    .then(() => {
-                                        successfulSends++;
-                                        logActivity(`Message ${i+1}/${messageCount} sent to ${webhook.name || 'Unnamed'}`, 'success');
-                                    })
-                                    .catch(error => {
-                                        failedSends++;
-                                        logActivity(`Failed to send message ${i+1}/${messageCount} to ${webhook.name || 'Unnamed'}: ${error.message}`, 'error');
-                                        throw error;
-                                    });
+                                try {
+                                    await sendWebhook(webhook.url, payload);
+                                    successfulSends++;
+                                    logActivity(`Message ${i+1} sent to ${webhook.name || 'Unnamed'}`, 'success');
+                                } catch (error) {
+                                    failedSends++;
+                                    logActivity(`Failed to send to ${webhook.name || 'Unnamed'}: ${error.message}`, 'error');
+                                }
                             })
                         );
                     }
                     
-                    const totalAttempts = selectedIndices.length * messageCount;
-                    const resultMessage = `Completed: ${successfulSends}/${totalAttempts} successful, ${failedSends} failed`;
-                    
+                    const resultMessage = `Completed: ${successfulSends} successful, ${failedSends} failed`;
                     showAlert(resultMessage, failedSends > 0 ? 'warning' : 'success');
                     logActivity(resultMessage, failedSends > 0 ? 'warning' : 'success');
+                    
                 } catch (error) {
-                    logActivity(`Error during sending: ${error.message}`, 'error');
-                    showAlert(`Error during sending: ${error.message}`, 'error');
+                    logActivity(`Unexpected error: ${error.message}`, 'error');
+                    showAlert(`Error: ${error.message}`, 'error');
                 } finally {
                     sendMessageBtn.disabled = false;
                     sendMessageBtn.innerHTML = '<i class="fas fa-paper-plane"></i> Send Message';
@@ -906,31 +883,26 @@ https://discord.com/api/webhooks/..."></textarea>
                     });
                     
                     if (!response.ok) {
-                        // Try to get error details from response
-                        let errorDetails = '';
+                        let errorMessage = `HTTP error! Status: ${response.status}`;
                         try {
                             const errorData = await response.json();
                             if (errorData.message) {
-                                errorDetails = errorData.message;
+                                errorMessage = errorData.message;
                             }
                         } catch (e) {
-                            // If we can't parse JSON error, just use status
-                            errorDetails = `Status: ${response.status}`;
+                            // Couldn't parse JSON error response
                         }
-                        
-                        throw new Error(`Webhook error: ${errorDetails}`);
+                        throw new Error(errorMessage);
                     }
                     
-                    return response;
+                    return await response.json();
                 } catch (error) {
-                    // Handle network errors or other fetch-related errors
-                    throw new Error(`Failed to send webhook: ${error.message}`);
+                    throw new Error(`Failed to send: ${error.message}`);
                 }
             }
             
             // Log activity to the response log
             function logActivity(message, type) {
-                // Remove empty state if it exists
                 const emptyState = responseLog.querySelector('.empty-state');
                 if (emptyState) {
                     responseLog.removeChild(emptyState);
@@ -941,17 +913,13 @@ https://discord.com/api/webhooks/..."></textarea>
                 
                 const responseItem = document.createElement('div');
                 responseItem.className = `response-item ${type}`;
-                
                 responseItem.innerHTML = `
                     <div class="response-content">
                         <div class="response-message">${message}</div>
                         <div class="response-time">${timeString}</div>
                     </div>
                 `;
-                
                 responseLog.insertBefore(responseItem, responseLog.firstChild);
-                
-                // Auto-scroll to top
                 responseLog.scrollTop = 0;
             }
             
@@ -966,16 +934,13 @@ https://discord.com/api/webhooks/..."></textarea>
                 alert.style.maxWidth = '400px';
                 alert.style.boxShadow = '0 4px 12px rgba(0,0,0,0.3)';
                 alert.style.animation = 'slideUp 0.3s ease-out';
-                
                 alert.innerHTML = `
                     <div class="response-content">
                         <div class="response-message">${message}</div>
                     </div>
                 `;
-                
                 document.body.appendChild(alert);
                 
-                // Remove after 3 seconds
                 setTimeout(() => {
                     alert.style.opacity = '0';
                     alert.style.transition = 'opacity 0.5s';
@@ -987,7 +952,6 @@ https://discord.com/api/webhooks/..."></textarea>
             
             // Check and handle empty states
             function checkEmptyStates() {
-                // Check webhooks
                 if (webhooks.length === 0) {
                     const emptyState = document.createElement('div');
                     emptyState.className = 'empty-state';
@@ -996,13 +960,10 @@ https://discord.com/api/webhooks/..."></textarea>
                         <h3>No webhooks saved</h3>
                         <p>Add your first webhook using the form above</p>
                     `;
-                    
-                    // Remove existing empty state if it exists
                     const existingEmpty = webhookList.querySelector('.empty-state');
                     if (existingEmpty) {
                         webhookList.removeChild(existingEmpty);
                     }
-                    
                     webhookList.appendChild(emptyState);
                 }
             }
