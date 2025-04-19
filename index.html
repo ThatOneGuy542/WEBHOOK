@@ -553,36 +553,228 @@ https://discord.com/api/webhooks/..."></textarea>
     <script>
         document.addEventListener('DOMContentLoaded', function() {
             // DOM Elements
-            const webhookNameInput = document.getElementById('webhook-name');
-            const webhookUrlInput = document.getElementById('webhook-url');
-            const addWebhookBtn = document.getElementById('add-webhook');
-            const webhookList = document.getElementById('webhook-list');
-            const usernameInput = document.getElementById('username');
-            const avatarUrlInput = document.getElementById('avatar-url');
-            const messageContentInput = document.getElementById('message-content');
-            const messageCountInput = document.getElementById('message-count');
-            const cooldownInput = document.getElementById('cooldown');
-            const selectedWebhooksSelect = document.getElementById('selected-webhooks');
-            const selectAllBtn = document.getElementById('select-all');
-            const deselectAllBtn = document.getElementById('deselect-all');
-            const sendMessageBtn = document.getElementById('send-message');
-            const responseLog = document.getElementById('response-log');
-            const copyAllBtn = document.getElementById('copy-all');
-            const deleteAllBtn = document.getElementById('delete-all');
-            
-            // Load saved webhooks from localStorage
+            const elements = {
+                webhookName: document.getElementById('webhook-name'),
+                webhookUrl: document.getElementById('webhook-url'),
+                addWebhookBtn: document.getElementById('add-webhook'),
+                webhookList: document.getElementById('webhook-list'),
+                username: document.getElementById('username'),
+                avatarUrl: document.getElementById('avatar-url'),
+                messageContent: document.getElementById('message-content'),
+                messageCount: document.getElementById('message-count'),
+                cooldown: document.getElementById('cooldown'),
+                selectedWebhooks: document.getElementById('selected-webhooks'),
+                sendMessageBtn: document.getElementById('send-message'),
+                responseLog: document.getElementById('response-log'),
+                copyAllBtn: document.getElementById('copy-all'),
+                deleteAllBtn: document.getElementById('delete-all')
+            };
+
+            // State Management
             let webhooks = JSON.parse(localStorage.getItem('discordWebhooks')) || [];
-            
+            let isSending = false;
+            let abortController = new AbortController();
+            const RATE_LIMIT_DELAY = 200; // 5 requests/second
+            const MAX_RETRIES = 2;
+
             // Initialize the app
             function init() {
                 renderWebhookList();
                 updateWebhookSelect();
                 checkEmptyStates();
+                addEventListeners();
             }
-            
-            // Render the webhook list
+
+            // Event Listeners
+            function addEventListeners() {
+                elements.addWebhookBtn.addEventListener('click', addWebhooks);
+                elements.sendMessageBtn.addEventListener('click', toggleSending);
+                elements.copyAllBtn.addEventListener('click', copyAllWebhooks);
+                elements.deleteAllBtn.addEventListener('click', deleteAllWebhooks);
+                document.getElementById('select-all').addEventListener('click', selectAll);
+                document.getElementById('deselect-all').addEventListener('click', deselectAll);
+            }
+
+            // Webhook Management Functions
+            function addWebhooks() {
+                const urls = elements.webhookUrl.value.trim().split('\n')
+                    .map(url => url.trim())
+                    .filter(url => url.length > 0 && isValidDiscordWebhook(url));
+
+                if (urls.length === 0) {
+                    showAlert('Please enter valid webhook URLs', 'error');
+                    return;
+                }
+
+                const newWebhooks = urls.map(url => ({
+                    name: elements.webhookName.value.trim(),
+                    url: url
+                }));
+
+                // Remove duplicates
+                webhooks = [...webhooks, ...newWebhooks].filter((wh, index, self) =>
+                    index === self.findIndex(t => t.url === wh.url)
+                );
+
+                saveWebhooks();
+                renderWebhookList();
+                updateWebhookSelect();
+                showAlert(`Added ${urls.length} webhooks`, 'success');
+            }
+
+            // Message Sending System
+            async function toggleSending() {
+                if (isSending) {
+                    abortController.abort();
+                    isSending = false;
+                    updateSendButton(false);
+                    showAlert('Operation cancelled', 'warning');
+                    return;
+                }
+
+                isSending = true;
+                abortController = new AbortController();
+                updateSendButton(true);
+
+                try {
+                    await processMessages();
+                } catch (error) {
+                    if (error.name !== 'AbortError') {
+                        showAlert(`Sending failed: ${error.message}`, 'error');
+                    }
+                } finally {
+                    isSending = false;
+                    updateSendButton(false);
+                }
+            }
+
+            async function processMessages() {
+                const selectedWebhooks = getSelectedWebhooks();
+                const messageData = getMessageData();
+                let successfulBatches = 0;
+
+                for (let batch = 0; batch < messageData.count; batch++) {
+                    if (abortController.signal.aborted) break;
+
+                    await sendMessageBatch(selectedWebhooks, messageData, batch);
+                    successfulBatches++;
+
+                    if (batch < messageData.count - 1) {
+                        await delay(messageData.cooldown);
+                    }
+                }
+
+                showAlert(`Completed ${successfulBatches}/${messageData.count} batches`, 'success');
+            }
+
+            async function sendMessageBatch(webhooks, messageData, batchNumber) {
+                const payload = createPayload(messageData);
+                let successCount = 0;
+                let failCount = 0;
+
+                for (const [index, webhook] of webhooks.entries()) {
+                    if (abortController.signal.aborted) break;
+
+                    try {
+                        await sendWithRetry(webhook, payload, batchNumber, index);
+                        successCount++;
+                    } catch (error) {
+                        failCount++;
+                        logActivity(`Batch ${batchNumber + 1} failed for ${webhook.name}: ${error.message}`, 'error');
+                    }
+
+                    // Rate limit delay between webhooks
+                    if (index < webhooks.length - 1) {
+                        await delay(RATE_LIMIT_DELAY);
+                    }
+                }
+
+                logActivity(`Batch ${batchNumber + 1} results: ${successCount} success, ${failCount} failed`, 'info');
+            }
+
+            async function sendWithRetry(webhook, payload, batchNumber, webhookIndex) {
+                let retries = 0;
+                while (retries <= MAX_RETRIES) {
+                    try {
+                        await sendWebhook(webhook.url, payload);
+                        logActivity(`Batch ${batchNumber + 1} sent to ${webhook.name}`, 'success');
+                        return;
+                    } catch (error) {
+                        if (retries === MAX_RETRIES) throw error;
+                        retries++;
+                        await delay(1000 * retries);
+                    }
+                }
+            }
+
+            // Webhook Operations
+            async function sendWebhook(url, payload) {
+                try {
+                    const response = await fetch(url, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(payload),
+                        signal: abortController.signal
+                    });
+
+                    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+                    return await response.json();
+                } catch (error) {
+                    throw new Error(error.message);
+                }
+            }
+
+            // Helper Functions
+            function isValidDiscordWebhook(url) {
+                try {
+                    const parsedUrl = new URL(url);
+                    return parsedUrl.hostname === 'discord.com' && 
+                           parsedUrl.pathname.startsWith('/api/webhooks/');
+                } catch (e) {
+                    return false;
+                }
+            }
+
+            function createPayload(messageData) {
+                return {
+                    content: messageData.content,
+                    ...(messageData.username && { username: messageData.username }),
+                    ...(messageData.avatarUrl && { avatar_url: messageData.avatarUrl })
+                };
+            }
+
+            function getSelectedWebhooks() {
+                return Array.from(elements.selectedWebhooks.selectedOptions)
+                    .map(option => webhooks[option.value]);
+            }
+
+            function getMessageData() {
+                return {
+                    content: elements.messageContent.value.trim(),
+                    username: elements.username.value.trim(),
+                    avatarUrl: elements.avatarUrl.value.trim(),
+                    count: Math.min(100, parseInt(elements.messageCount.value) || 1),
+                    cooldown: Math.max(1000, parseInt(elements.cooldown.value) || 1000)
+                };
+            }
+
+            function updateSendButton(sending) {
+                elements.sendMessageBtn.disabled = false;
+                elements.sendMessageBtn.innerHTML = sending
+                    ? '<i class="fas fa-stop-circle"></i> Stop Sending'
+                    : '<i class="fas fa-paper-plane"></i> Send Message';
+            }
+
+            function delay(ms) {
+                return new Promise(resolve => setTimeout(resolve, ms));
+            }
+
+            function saveWebhooks() {
+                localStorage.setItem('discordWebhooks', JSON.stringify(webhooks));
+            }
+
             function renderWebhookList() {
-                webhookList.innerHTML = '';
+                elements.webhookList.innerHTML = '';
                 
                 if (webhooks.length === 0) {
                     const emptyState = document.createElement('div');
@@ -592,7 +784,7 @@ https://discord.com/api/webhooks/..."></textarea>
                         <h3>No webhooks saved</h3>
                         <p>Add your first webhook using the form above</p>
                     `;
-                    webhookList.appendChild(emptyState);
+                    elements.webhookList.appendChild(emptyState);
                     return;
                 }
                 
@@ -613,103 +805,24 @@ https://discord.com/api/webhooks/..."></textarea>
                             </button>
                         </div>
                     `;
-                    webhookList.appendChild(webhookItem);
-                });
-                
-                // Add event listeners to buttons
-                document.querySelectorAll('.delete-btn').forEach(btn => {
-                    btn.addEventListener('click', function() {
-                        const index = parseInt(this.getAttribute('data-index'));
-                        deleteWebhook(index);
-                    });
-                });
-                
-                document.querySelectorAll('.test-btn').forEach(btn => {
-                    btn.addEventListener('click', function() {
-                        const index = parseInt(this.getAttribute('data-index'));
-                        testWebhook(index);
-                    });
+                    elements.webhookList.appendChild(webhookItem);
+                    
+                    // Add event listeners to buttons
+                    webhookItem.querySelector('.delete-btn').addEventListener('click', () => deleteWebhook(index));
+                    webhookItem.querySelector('.test-btn').addEventListener('click', () => testWebhook(index));
                 });
             }
-            
-            // Update the webhook select dropdown
+
             function updateWebhookSelect() {
-                selectedWebhooksSelect.innerHTML = '';
+                elements.selectedWebhooks.innerHTML = '';
                 webhooks.forEach((webhook, index) => {
                     const option = document.createElement('option');
                     option.value = index;
                     option.textContent = webhook.name || `Webhook ${index + 1}`;
-                    selectedWebhooksSelect.appendChild(option);
+                    elements.selectedWebhooks.appendChild(option);
                 });
-            }
-            
-            // Validate Discord webhook URL
-            function isValidDiscordWebhook(url) {
-                try {
-                    const parsedUrl = new URL(url);
-                    return parsedUrl.hostname === 'discord.com' && 
-                           parsedUrl.pathname.startsWith('/api/webhooks/');
-                } catch (e) {
-                    return false;
-                }
             }
 
-            // Add multiple webhooks
-            function addWebhooks() {
-                const name = webhookNameInput.value.trim();
-                const urlsInput = webhookUrlInput.value.trim();
-                
-                if (!urlsInput) {
-                    showAlert('Please enter at least one webhook URL', 'error');
-                    return;
-                }
-                
-                const urlStrings = urlsInput.split('\n')
-                    .map(url => url.trim())
-                    .filter(url => url.length > 0);
-                
-                if (urlStrings.length === 0) {
-                    showAlert('Please enter valid webhook URLs (one per line)', 'error');
-                    return;
-                }
-                
-                let addedCount = 0;
-                let invalidCount = 0;
-                
-                urlStrings.forEach(url => {
-                    if (!isValidDiscordWebhook(url)) {
-                        logActivity(`Invalid webhook URL: ${url}`, 'error');
-                        invalidCount++;
-                        return;
-                    }
-                    
-                    if (webhooks.some(wh => wh.url === url)) {
-                        logActivity(`Webhook already exists: ${url}`, 'warning');
-                        return;
-                    }
-                    
-                    const newWebhook = { name, url };
-                    webhooks.push(newWebhook);
-                    addedCount++;
-                    logActivity(`Added webhook: ${name || 'Unnamed'} (${url})`, 'success');
-                });
-                
-                if (addedCount > 0 || invalidCount > 0) {
-                    saveWebhooks();
-                    webhookUrlInput.value = '';
-                    renderWebhookList();
-                    updateWebhookSelect();
-                    checkEmptyStates();
-                    
-                    if (invalidCount > 0) {
-                        showAlert(`Added ${addedCount} webhook(s), skipped ${invalidCount} invalid`, 'warning');
-                    } else {
-                        showAlert(`Added ${addedCount} webhook(s) successfully!`, 'success');
-                    }
-                }
-            }
-            
-            // Delete a webhook
             function deleteWebhook(index) {
                 if (confirm('Are you sure you want to delete this webhook?')) {
                     const deletedWebhook = webhooks[index];
@@ -722,8 +835,7 @@ https://discord.com/api/webhooks/..."></textarea>
                     showAlert('Webhook deleted', 'success');
                 }
             }
-            
-            // Delete all webhooks
+
             function deleteAllWebhooks() {
                 if (webhooks.length === 0) {
                     showAlert('No webhooks to delete', 'error');
@@ -740,8 +852,7 @@ https://discord.com/api/webhooks/..."></textarea>
                     showAlert('All webhooks deleted', 'success');
                 }
             }
-            
-            // Copy all webhook URLs
+
             function copyAllWebhooks() {
                 if (webhooks.length === 0) {
                     showAlert('No webhooks to copy', 'error');
@@ -758,8 +869,7 @@ https://discord.com/api/webhooks/..."></textarea>
                     console.error('Failed to copy: ', err);
                 });
             }
-            
-            // Test a webhook
+
             function testWebhook(index) {
                 const webhook = webhooks[index];
                 const payload = {
@@ -780,160 +890,11 @@ https://discord.com/api/webhooks/..."></textarea>
                         showAlert(`Test failed: ${error.message}`, 'error');
                     });
             }
-            
-            // Save webhooks to localStorage
-            function saveWebhooks() {
-                localStorage.setItem('discordWebhooks', JSON.stringify(webhooks));
-            }
-            
-            // Send message to selected webhooks
-            async function sendMessage() {
-                const selectedOptions = Array.from(selectedWebhooksSelect.selectedOptions);
-                const selectedIndices = selectedOptions.map(option => parseInt(option.value));
-                
-                if (selectedIndices.length === 0) {
-                    showAlert('Please select at least one webhook', 'error');
-                    return;
-                }
-                
-                const message = messageContentInput.value.trim();
-                if (!message) {
-                    showAlert('Please enter a message', 'error');
-                    return;
-                }
-                
-                const messageCount = parseInt(messageCountInput.value) || 1;
-                const cooldown = parseInt(cooldownInput.value) || 1000;
-                
-                sendMessageBtn.disabled = true;
-                sendMessageBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Sending...';
-                
-                try {
-                    let successfulSends = 0;
-                    let failedSends = 0;
-                    
-                    logActivity(`Starting to send ${messageCount} message(s) to ${selectedIndices.length} webhook(s)`, 'info');
-                    
-                    const username = usernameInput.value.trim();
-                    const avatarUrl = avatarUrlInput.value.trim();
-                    
-                    for (let i = 0; i < messageCount; i++) {
-                        if (i > 0) {
-                            sendMessageBtn.innerHTML = `<i class="fas fa-spinner fa-spin"></i> Sending (${i+1}/${messageCount})...`;
-                            await new Promise(resolve => setTimeout(resolve, cooldown));
-                        }
-                        
-                        const payload = {
-                            content: message,
-                            ...(username && { username }),
-                            ...(avatarUrl && { avatar_url: avatarUrl })
-                        };
-                        
-                        for (const index of selectedIndices) {
-                            const webhook = webhooks[index];
-                            try {
-                                await sendWebhook(webhook.url, payload);
-                                successfulSends++;
-                                logActivity(`Message ${i+1} sent to ${webhook.name || 'Unnamed'}`, 'success');
-                            } catch (error) {
-                                failedSends++;
-                                logActivity(`Failed to send to ${webhook.name || 'Unnamed'}: ${error.message}`, 'error');
-                            }
-                        }
-                    }
-                    
-                    const resultMessage = `Completed: ${successfulSends} successful, ${failedSends} failed`;
-                    showAlert(resultMessage, failedSends > 0 ? 'warning' : 'success');
-                    logActivity(resultMessage, failedSends > 0 ? 'warning' : 'success');
-                    
-                } catch (error) {
-                    logActivity(`Unexpected error: ${error.message}`, 'error');
-                    showAlert(`Error: ${error.message}`, 'error');
-                } finally {
-                    sendMessageBtn.disabled = false;
-                    sendMessageBtn.innerHTML = '<i class="fas fa-paper-plane"></i> Send Message';
-                }
-            }
-            
-            // Send a webhook request using multiple methods
-            async function sendWebhook(url, payload) {
-                // Method 1: Try Fetch API first
-                try {
-                    const response = await fetch(url, {
-                        method: 'POST',
-                        headers: {
-                            'Content-Type': 'application/json'
-                        },
-                        body: JSON.stringify(payload)
-                    });
 
-                    if (!response.ok) {
-                        throw new Error(`HTTP error! Status: ${response.status}`);
-                    }
-
-                    return await response.json();
-                } catch (fetchError) {
-                    // Method 2: Fallback to XHR if Fetch fails
-                    try {
-                        return await new Promise((resolve, reject) => {
-                            const xhr = new XMLHttpRequest();
-                            xhr.open('POST', url, true);
-                            xhr.setRequestHeader('Content-Type', 'application/json');
-                            
-                            xhr.onload = function() {
-                                if (xhr.status >= 200 && xhr.status < 300) {
-                                    resolve(JSON.parse(xhr.responseText));
-                                } else {
-                                    reject(new Error(`XHR error: ${xhr.status}`));
-                                }
-                            };
-                            
-                            xhr.onerror = function() {
-                                reject(new Error('XHR network error'));
-                            };
-                            
-                            xhr.send(JSON.stringify(payload));
-                        });
-                    } catch (xhrError) {
-                        // Method 3: Final fallback to iframe method
-                        try {
-                            return await new Promise((resolve, reject) => {
-                                const iframe = document.createElement('iframe');
-                                iframe.style.display = 'none';
-                                document.body.appendChild(iframe);
-                                
-                                const form = document.createElement('form');
-                                form.method = 'POST';
-                                form.action = url;
-                                form.target = iframe.name || '_blank';
-                                
-                                const input = document.createElement('input');
-                                input.type = 'hidden';
-                                input.name = 'payload_json';
-                                input.value = JSON.stringify(payload);
-                                form.appendChild(input);
-                                
-                                document.body.appendChild(form);
-                                form.submit();
-                                
-                                setTimeout(() => {
-                                    document.body.removeChild(form);
-                                    document.body.removeChild(iframe);
-                                    resolve({ status: 'success' });
-                                }, 3000);
-                            });
-                        } catch (iframeError) {
-                            throw new Error(`All methods failed: ${iframeError.message}`);
-                        }
-                    }
-                }
-            }
-            
-            // Log activity to the response log
             function logActivity(message, type) {
-                const emptyState = responseLog.querySelector('.empty-state');
+                const emptyState = elements.responseLog.querySelector('.empty-state');
                 if (emptyState) {
-                    responseLog.removeChild(emptyState);
+                    elements.responseLog.removeChild(emptyState);
                 }
                 
                 const now = new Date();
@@ -947,11 +908,10 @@ https://discord.com/api/webhooks/..."></textarea>
                         <div class="response-time">${timeString}</div>
                     </div>
                 `;
-                responseLog.insertBefore(responseItem, responseLog.firstChild);
-                responseLog.scrollTop = 0;
+                elements.responseLog.insertBefore(responseItem, elements.responseLog.firstChild);
+                elements.responseLog.scrollTop = 0;
             }
-            
-            // Show a temporary alert
+
             function showAlert(message, type) {
                 const alert = document.createElement('div');
                 alert.className = `response-item ${type}`;
@@ -977,8 +937,7 @@ https://discord.com/api/webhooks/..."></textarea>
                     }, 500);
                 }, 3000);
             }
-            
-            // Check and handle empty states
+
             function checkEmptyStates() {
                 if (webhooks.length === 0) {
                     const emptyState = document.createElement('div');
@@ -988,33 +947,27 @@ https://discord.com/api/webhooks/..."></textarea>
                         <h3>No webhooks saved</h3>
                         <p>Add your first webhook using the form above</p>
                     `;
-                    const existingEmpty = webhookList.querySelector('.empty-state');
+                    const existingEmpty = elements.webhookList.querySelector('.empty-state');
                     if (existingEmpty) {
-                        webhookList.removeChild(existingEmpty);
+                        elements.webhookList.removeChild(existingEmpty);
                     }
-                    webhookList.appendChild(emptyState);
+                    elements.webhookList.appendChild(emptyState);
                 }
             }
-            
-            // Event listeners
-            addWebhookBtn.addEventListener('click', addWebhooks);
-            sendMessageBtn.addEventListener('click', sendMessage);
-            copyAllBtn.addEventListener('click', copyAllWebhooks);
-            deleteAllBtn.addEventListener('click', deleteAllWebhooks);
-            
-            selectAllBtn.addEventListener('click', function() {
-                Array.from(selectedWebhooksSelect.options).forEach(option => {
+
+            function selectAll() {
+                Array.from(elements.selectedWebhooks.options).forEach(option => {
                     option.selected = true;
                 });
-            });
-            
-            deselectAllBtn.addEventListener('click', function() {
-                Array.from(selectedWebhooksSelect.options).forEach(option => {
+            }
+
+            function deselectAll() {
+                Array.from(elements.selectedWebhooks.options).forEach(option => {
                     option.selected = false;
                 });
-            });
-            
-            // Initialize the app
+            }
+
+            // Initialize the application
             init();
         });
     </script>
