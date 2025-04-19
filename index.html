@@ -342,6 +342,11 @@
             background-color: rgba(255, 51, 51, 0.1);
         }
 
+        .response-item.info {
+            border-left-color: var(--primary);
+            background-color: rgba(255, 0, 0, 0.1);
+        }
+
         .response-content {
             display: flex;
             justify-content: space-between;
@@ -645,6 +650,17 @@ https://discord.com/api/webhooks/..."></textarea>
                 });
             }
             
+            // Validate Discord webhook URL
+            function isValidDiscordWebhook(url) {
+                try {
+                    const parsedUrl = new URL(url);
+                    return parsedUrl.hostname === 'discord.com' && 
+                           parsedUrl.pathname.startsWith('/api/webhooks/');
+                } catch (e) {
+                    return false;
+                }
+            }
+
             // Add multiple webhooks
             function addWebhooks() {
                 const name = webhookNameInput.value.trim();
@@ -666,20 +682,29 @@ https://discord.com/api/webhooks/..."></textarea>
                 }
                 
                 let addedCount = 0;
+                let invalidCount = 0;
                 
                 urlStrings.forEach(url => {
-                    // Validate URL (simple check)
-                    if (!url.startsWith('https://discord.com/api/webhooks/')) {
-                        showAlert(`Skipping invalid URL: ${url}`, 'error');
+                    // Validate URL
+                    if (!isValidDiscordWebhook(url)) {
+                        logActivity(`Invalid webhook URL: ${url}`, 'error');
+                        invalidCount++;
+                        return;
+                    }
+                    
+                    // Check for duplicates
+                    if (webhooks.some(wh => wh.url === url)) {
+                        logActivity(`Webhook already exists: ${url}`, 'warning');
                         return;
                     }
                     
                     const newWebhook = { name, url };
                     webhooks.push(newWebhook);
                     addedCount++;
+                    logActivity(`Added webhook: ${name || 'Unnamed'} (${url})`, 'success');
                 });
                 
-                if (addedCount > 0) {
+                if (addedCount > 0 || invalidCount > 0) {
                     saveWebhooks();
                     
                     // Clear inputs
@@ -690,19 +715,25 @@ https://discord.com/api/webhooks/..."></textarea>
                     updateWebhookSelect();
                     checkEmptyStates();
                     
-                    showAlert(`Added ${addedCount} webhook(s) successfully!`, 'success');
+                    if (invalidCount > 0) {
+                        showAlert(`Added ${addedCount} webhook(s), skipped ${invalidCount} invalid`, 'warning');
+                    } else {
+                        showAlert(`Added ${addedCount} webhook(s) successfully!`, 'success');
+                    }
                 }
             }
             
             // Delete a webhook
             function deleteWebhook(index) {
                 if (confirm('Are you sure you want to delete this webhook?')) {
+                    const deletedWebhook = webhooks[index];
                     webhooks.splice(index, 1);
                     saveWebhooks();
                     renderWebhookList();
                     updateWebhookSelect();
                     checkEmptyStates();
                     
+                    logActivity(`Deleted webhook: ${deletedWebhook.name || 'Unnamed'} (${deletedWebhook.url})`, 'info');
                     showAlert('Webhook deleted', 'success');
                 }
             }
@@ -715,6 +746,7 @@ https://discord.com/api/webhooks/..."></textarea>
                 }
                 
                 if (confirm('Are you sure you want to delete ALL webhooks? This cannot be undone.')) {
+                    logActivity(`Deleted all ${webhooks.length} webhooks`, 'info');
                     webhooks = [];
                     saveWebhooks();
                     renderWebhookList();
@@ -734,8 +766,10 @@ https://discord.com/api/webhooks/..."></textarea>
                 
                 const urls = webhooks.map(webhook => webhook.url).join('\n');
                 navigator.clipboard.writeText(urls).then(() => {
+                    logActivity('Copied all webhook URLs to clipboard', 'info');
                     showAlert('Copied all webhook URLs to clipboard', 'success');
                 }).catch(err => {
+                    logActivity('Failed to copy webhook URLs', 'error');
                     showAlert('Failed to copy webhook URLs', 'error');
                     console.error('Failed to copy: ', err);
                 });
@@ -750,7 +784,7 @@ https://discord.com/api/webhooks/..."></textarea>
                     avatar_url: 'https://cdn.discordapp.com/emojis/848931236986454026.png'
                 };
                 
-                logActivity(`Testing webhook: ${webhook.name || 'Unnamed'}`, 'info');
+                logActivity(`Testing webhook: ${webhook.name || 'Unnamed'} (${webhook.url})`, 'info');
                 
                 sendWebhook(webhook.url, payload)
                     .then(() => {
@@ -815,6 +849,9 @@ https://discord.com/api/webhooks/..."></textarea>
                     // Log start of sending
                     logActivity(`Starting to send ${messageCount} message(s) to ${selectedIndices.length} webhook(s)`, 'info');
                     
+                    let successfulSends = 0;
+                    let failedSends = 0;
+                    
                     // Send multiple times with cooldown
                     for (let i = 0; i < messageCount; i++) {
                         if (i > 0) {
@@ -826,46 +863,69 @@ https://discord.com/api/webhooks/..."></textarea>
                         }
                         
                         // Send to each selected webhook
-                        const promises = selectedIndices.map(index => {
-                            const webhook = webhooks[index];
-                            return sendWebhook(webhook.url, payload)
-                                .then(() => {
-                                    logActivity(`Message ${i+1}/${messageCount} sent to ${webhook.name || 'Unnamed'}`, 'success');
-                                })
-                                .catch(error => {
-                                    logActivity(`Failed to send message ${i+1}/${messageCount} to ${webhook.name || 'Unnamed'}: ${error.message}`, 'error');
-                                    throw error;
-                                });
-                        });
-                        
-                        await Promise.all(promises);
+                        const results = await Promise.allSettled(
+                            selectedIndices.map(index => {
+                                const webhook = webhooks[index];
+                                return sendWebhook(webhook.url, payload)
+                                    .then(() => {
+                                        successfulSends++;
+                                        logActivity(`Message ${i+1}/${messageCount} sent to ${webhook.name || 'Unnamed'}`, 'success');
+                                    })
+                                    .catch(error => {
+                                        failedSends++;
+                                        logActivity(`Failed to send message ${i+1}/${messageCount} to ${webhook.name || 'Unnamed'}: ${error.message}`, 'error');
+                                        throw error;
+                                    });
+                            })
+                        );
                     }
                     
-                    showAlert(`Successfully sent ${messageCount} message(s) to ${selectedIndices.length} webhook(s)`, 'success');
-                    logActivity(`Completed sending ${messageCount} message(s) to ${selectedIndices.length} webhook(s)`, 'success');
+                    const totalAttempts = selectedIndices.length * messageCount;
+                    const resultMessage = `Completed: ${successfulSends}/${totalAttempts} successful, ${failedSends} failed`;
+                    
+                    showAlert(resultMessage, failedSends > 0 ? 'warning' : 'success');
+                    logActivity(resultMessage, failedSends > 0 ? 'warning' : 'success');
                 } catch (error) {
-                    showAlert(`Completed with some errors: ${error.message}`, 'error');
+                    logActivity(`Error during sending: ${error.message}`, 'error');
+                    showAlert(`Error during sending: ${error.message}`, 'error');
                 } finally {
                     sendMessageBtn.disabled = false;
                     sendMessageBtn.innerHTML = '<i class="fas fa-paper-plane"></i> Send Message';
                 }
             }
             
-            // Send a webhook request
-            function sendWebhook(url, payload) {
-                return fetch(url, {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json'
-                    },
-                    body: JSON.stringify(payload)
-                })
-                .then(response => {
+            // Send a webhook request with proper error handling
+            async function sendWebhook(url, payload) {
+                try {
+                    const response = await fetch(url, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify(payload)
+                    });
+                    
                     if (!response.ok) {
-                        throw new Error(`HTTP error! status: ${response.status}`);
+                        // Try to get error details from response
+                        let errorDetails = '';
+                        try {
+                            const errorData = await response.json();
+                            if (errorData.message) {
+                                errorDetails = errorData.message;
+                            }
+                        } catch (e) {
+                            // If we can't parse JSON error, just use status
+                            errorDetails = `Status: ${response.status}`;
+                        }
+                        
+                        throw new Error(`Webhook error: ${errorDetails}`);
                     }
+                    
                     return response;
-                });
+                } catch (error) {
+                    // Handle network errors or other fetch-related errors
+                    throw new Error(`Failed to send webhook: ${error.message}`);
+                }
             }
             
             // Log activity to the response log
