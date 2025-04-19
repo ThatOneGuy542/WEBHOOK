@@ -8,18 +8,19 @@
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <style>
         :root {
-            --primary: #000000;
-            --primary-dark: #333333;
+            --primary: #ff0000;
+            --primary-dark: #cc0000;
             --dark: #000000;
             --light: #FFFFFF;
-            --success: #000000;
-            --warning: #555555;
-            --danger: #000000;
+            --success: #00aa00;
+            --warning: #ffcc00;
+            --danger: #ff3333;
             --gray: #888888;
-            --gray-light: #f0f0f0;
-            --border: #e0e0e0;
-            --shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+            --gray-light: #1a1a1a;
+            --border: #333333;
+            --shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
             --discord-blurple: #5865F2;
+            --transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
         }
 
         * {
@@ -49,18 +50,20 @@
             border-bottom: 1px solid #333;
             padding-bottom: 20px;
             position: relative;
+            animation: fadeIn 0.8s ease-out;
         }
 
         h1 {
             font-size: 2.5rem;
             font-weight: 700;
-            color: var(--light);
+            color: var(--primary);
             margin-bottom: 16px;
             letter-spacing: 1px;
+            text-shadow: 0 2px 4px rgba(255, 0, 0, 0.3);
         }
 
         h1 i {
-            color: var(--light);
+            color: var(--primary);
             margin-right: 12px;
         }
 
@@ -85,21 +88,29 @@
 
         .join-community .btn:hover {
             background-color: #4752c4;
+            transform: translateY(-2px);
         }
 
         .card {
-            background-color: #222222;
+            background-color: #1a1a1a;
             border-radius: 12px;
             box-shadow: var(--shadow);
             padding: 32px;
             margin-bottom: 32px;
             border: 1px solid #333;
+            transition: var(--transition);
+            animation: slideUp 0.5s ease-out;
+        }
+
+        .card:hover {
+            box-shadow: 0 8px 30px rgba(255, 0, 0, 0.2);
+            border-color: var(--primary);
         }
 
         h2 {
             font-size: 1.5rem;
             font-weight: 600;
-            color: var(--light);
+            color: var(--primary);
             margin-bottom: 24px;
             display: flex;
             align-items: center;
@@ -107,7 +118,7 @@
 
         h2 i {
             margin-right: 12px;
-            color: var(--light);
+            color: var(--primary);
             font-size: 1.3rem;
         }
 
@@ -137,15 +148,15 @@
             border: 1px solid #444;
             border-radius: 8px;
             font-size: 1rem;
-            transition: all 0.2s;
-            background-color: #333;
+            transition: var(--transition);
+            background-color: #222;
             color: white;
         }
 
         input:focus, textarea:focus, select:focus {
             outline: none;
-            border-color: #666;
-            box-shadow: 0 0 0 3px rgba(100, 100, 100, 0.1);
+            border-color: var(--primary);
+            box-shadow: 0 0 0 3px rgba(255, 0, 0, 0.1);
         }
 
         textarea {
@@ -170,7 +181,7 @@
             display: inline-flex;
             align-items: center;
             justify-content: center;
-            background-color: #000;
+            background-color: var(--primary);
             color: white;
             border: none;
             padding: 14px 24px;
@@ -178,14 +189,19 @@
             cursor: pointer;
             font-weight: 500;
             font-size: 1rem;
-            transition: all 0.2s;
-            border: 1px solid #444;
+            transition: var(--transition);
+            border: 1px solid var(--primary-dark);
             text-decoration: none;
         }
 
         .btn:hover {
-            background-color: #111;
-            transform: translateY(-1px);
+            background-color: var(--primary-dark);
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(255, 0, 0, 0.2);
+        }
+
+        .btn:active {
+            transform: translateY(0);
         }
 
         .btn i {
@@ -193,12 +209,13 @@
         }
 
         .btn-danger {
-            background-color: #000;
-            border: 1px solid #444;
+            background-color: #d32f2f;
+            border: 1px solid #b71c1c;
         }
 
         .btn-danger:hover {
-            background-color: #111;
+            background-color: #b71c1c;
+            box-shadow: 0 4px 12px rgba(211, 47, 47, 0.2);
         }
 
         .btn-secondary {
@@ -208,6 +225,7 @@
 
         .btn-secondary:hover {
             background-color: #444;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
         }
 
         .webhook-list {
@@ -218,19 +236,19 @@
         }
 
         .webhook-item {
-            background-color: #2a2a2a;
+            background-color: #222;
             padding: 20px;
             border-radius: 8px;
-            border: 1px solid #444;
+            border: 1px solid #333;
             display: flex;
             flex-direction: column;
-            transition: all 0.2s;
+            transition: var(--transition);
         }
 
         .webhook-item:hover {
-            transform: translateY(-2px);
+            transform: translateY(-5px);
             box-shadow: var(--shadow);
-            border-color: #666;
+            border-color: var(--primary);
         }
 
         .webhook-header {
@@ -283,9 +301,25 @@
             background-color: #222;
             padding: 20px;
             border-radius: 8px;
-            border: 1px solid #444;
+            border: 1px solid #333;
             max-height: 400px;
             overflow-y: auto;
+            scrollbar-width: thin;
+            scrollbar-color: var(--primary) #333;
+        }
+
+        .response-log::-webkit-scrollbar {
+            width: 8px;
+        }
+
+        .response-log::-webkit-scrollbar-track {
+            background: #333;
+            border-radius: 4px;
+        }
+
+        .response-log::-webkit-scrollbar-thumb {
+            background-color: var(--primary);
+            border-radius: 4px;
         }
 
         .response-item {
@@ -293,17 +327,19 @@
             margin-bottom: 12px;
             border-radius: 8px;
             border-left: 4px solid #666;
-            background-color: #2a2a2a;
+            background-color: #222;
+            transition: var(--transition);
+            animation: fadeIn 0.5s ease-out;
         }
 
         .response-item.success {
-            border-left-color: #000;
-            background-color: rgba(0, 0, 0, 0.2);
+            border-left-color: var(--success);
+            background-color: rgba(0, 170, 0, 0.1);
         }
 
         .response-item.error {
-            border-left-color: #000;
-            background-color: rgba(50, 50, 50, 0.2);
+            border-left-color: var(--danger);
+            background-color: rgba(255, 51, 51, 0.1);
         }
 
         .response-content {
@@ -325,6 +361,7 @@
             text-align: center;
             padding: 40px;
             color: #777;
+            animation: fadeIn 0.8s ease-out;
         }
 
         .empty-state i {
@@ -347,6 +384,42 @@
 
         .spam-control {
             flex: 1;
+        }
+
+        .bulk-actions {
+            display: flex;
+            gap: 12px;
+            margin-top: 20px;
+        }
+
+        .bulk-actions .btn {
+            flex: 1;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+
+        @keyframes slideUp {
+            from { 
+                opacity: 0;
+                transform: translateY(20px);
+            }
+            to { 
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        @keyframes pulse {
+            0% { box-shadow: 0 0 0 0 rgba(255, 0, 0, 0.4); }
+            70% { box-shadow: 0 0 0 10px rgba(255, 0, 0, 0); }
+            100% { box-shadow: 0 0 0 0 rgba(255, 0, 0, 0); }
+        }
+
+        .pulse {
+            animation: pulse 1.5s infinite;
         }
 
         @media (max-width: 768px) {
@@ -407,10 +480,16 @@ https://discord.com/api/webhooks/...
 https://discord.com/api/webhooks/..."></textarea>
                 <div class="webhook-input-hint">Enter one webhook URL per line</div>
             </div>
-            <button id="add-webhook" class="btn"><i class="fas fa-plus"></i> Add All Webhooks</button>
+            <button id="add-webhook" class="btn pulse"><i class="fas fa-plus"></i> Add All Webhooks</button>
             
             <div id="webhook-list-container">
-                <h3 style="margin-top: 32px; margin-bottom: 16px; color: #DDD;">Saved Webhooks</h3>
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 32px; margin-bottom: 16px;">
+                    <h3 style="color: #DDD;">Saved Webhooks</h3>
+                    <div class="bulk-actions">
+                        <button id="copy-all" class="btn btn-secondary"><i class="fas fa-copy"></i> Copy All</button>
+                        <button id="delete-all" class="btn btn-danger"><i class="fas fa-trash"></i> Delete All</button>
+                    </div>
+                </div>
                 <div id="webhook-list" class="webhook-list"></div>
             </div>
         </div>
@@ -451,7 +530,7 @@ https://discord.com/api/webhooks/..."></textarea>
                     <button id="deselect-all" class="btn btn-secondary"><i class="fas fa-times-circle"></i> Deselect All</button>
                 </div>
             </div>
-            <button id="send-message" class="btn"><i class="fas fa-paper-plane"></i> Send Message</button>
+            <button id="send-message" class="btn pulse"><i class="fas fa-paper-plane"></i> Send Message</button>
         </div>
         
         <div class="card">
@@ -459,8 +538,8 @@ https://discord.com/api/webhooks/..."></textarea>
             <div id="response-log" class="response-log">
                 <div class="empty-state">
                     <i class="fas fa-history"></i>
-                    <h3>No activity logging</h3>
-                    <p>Activity logging has been disabled</p>
+                    <h3>No activity yet</h3>
+                    <p>Your activity log will appear here</p>
                 </div>
             </div>
         </div>
@@ -484,6 +563,8 @@ https://discord.com/api/webhooks/..."></textarea>
             const deselectAllBtn = document.getElementById('deselect-all');
             const sendMessageBtn = document.getElementById('send-message');
             const responseLog = document.getElementById('response-log');
+            const copyAllBtn = document.getElementById('copy-all');
+            const deleteAllBtn = document.getElementById('delete-all');
             
             // Load saved webhooks from localStorage
             let webhooks = JSON.parse(localStorage.getItem('discordWebhooks')) || [];
@@ -626,6 +707,40 @@ https://discord.com/api/webhooks/..."></textarea>
                 }
             }
             
+            // Delete all webhooks
+            function deleteAllWebhooks() {
+                if (webhooks.length === 0) {
+                    showAlert('No webhooks to delete', 'error');
+                    return;
+                }
+                
+                if (confirm('Are you sure you want to delete ALL webhooks? This cannot be undone.')) {
+                    webhooks = [];
+                    saveWebhooks();
+                    renderWebhookList();
+                    updateWebhookSelect();
+                    checkEmptyStates();
+                    
+                    showAlert('All webhooks deleted', 'success');
+                }
+            }
+            
+            // Copy all webhook URLs
+            function copyAllWebhooks() {
+                if (webhooks.length === 0) {
+                    showAlert('No webhooks to copy', 'error');
+                    return;
+                }
+                
+                const urls = webhooks.map(webhook => webhook.url).join('\n');
+                navigator.clipboard.writeText(urls).then(() => {
+                    showAlert('Copied all webhook URLs to clipboard', 'success');
+                }).catch(err => {
+                    showAlert('Failed to copy webhook URLs', 'error');
+                    console.error('Failed to copy: ', err);
+                });
+            }
+            
             // Test a webhook
             function testWebhook(index) {
                 const webhook = webhooks[index];
@@ -635,7 +750,17 @@ https://discord.com/api/webhooks/..."></textarea>
                     avatar_url: 'https://cdn.discordapp.com/emojis/848931236986454026.png'
                 };
                 
-                sendWebhook(webhook.url, payload);
+                logActivity(`Testing webhook: ${webhook.name || 'Unnamed'}`, 'info');
+                
+                sendWebhook(webhook.url, payload)
+                    .then(() => {
+                        logActivity(`Test successful for ${webhook.name || 'Unnamed'}`, 'success');
+                        showAlert('Test message sent successfully', 'success');
+                    })
+                    .catch(error => {
+                        logActivity(`Test failed for ${webhook.name || 'Unnamed'}: ${error.message}`, 'error');
+                        showAlert(`Test failed: ${error.message}`, 'error');
+                    });
             }
             
             // Save webhooks to localStorage
@@ -687,6 +812,9 @@ https://discord.com/api/webhooks/..."></textarea>
                 sendMessageBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Sending...';
                 
                 try {
+                    // Log start of sending
+                    logActivity(`Starting to send ${messageCount} message(s) to ${selectedIndices.length} webhook(s)`, 'info');
+                    
                     // Send multiple times with cooldown
                     for (let i = 0; i < messageCount; i++) {
                         if (i > 0) {
@@ -700,13 +828,21 @@ https://discord.com/api/webhooks/..."></textarea>
                         // Send to each selected webhook
                         const promises = selectedIndices.map(index => {
                             const webhook = webhooks[index];
-                            return sendWebhook(webhook.url, payload);
+                            return sendWebhook(webhook.url, payload)
+                                .then(() => {
+                                    logActivity(`Message ${i+1}/${messageCount} sent to ${webhook.name || 'Unnamed'}`, 'success');
+                                })
+                                .catch(error => {
+                                    logActivity(`Failed to send message ${i+1}/${messageCount} to ${webhook.name || 'Unnamed'}: ${error.message}`, 'error');
+                                    throw error;
+                                });
                         });
                         
                         await Promise.all(promises);
                     }
                     
                     showAlert(`Successfully sent ${messageCount} message(s) to ${selectedIndices.length} webhook(s)`, 'success');
+                    logActivity(`Completed sending ${messageCount} message(s) to ${selectedIndices.length} webhook(s)`, 'success');
                 } catch (error) {
                     showAlert(`Completed with some errors: ${error.message}`, 'error');
                 } finally {
@@ -729,10 +865,34 @@ https://discord.com/api/webhooks/..."></textarea>
                         throw new Error(`HTTP error! status: ${response.status}`);
                     }
                     return response;
-                })
-                .catch(error => {
-                    throw error;
                 });
+            }
+            
+            // Log activity to the response log
+            function logActivity(message, type) {
+                // Remove empty state if it exists
+                const emptyState = responseLog.querySelector('.empty-state');
+                if (emptyState) {
+                    responseLog.removeChild(emptyState);
+                }
+                
+                const now = new Date();
+                const timeString = now.toLocaleTimeString();
+                
+                const responseItem = document.createElement('div');
+                responseItem.className = `response-item ${type}`;
+                
+                responseItem.innerHTML = `
+                    <div class="response-content">
+                        <div class="response-message">${message}</div>
+                        <div class="response-time">${timeString}</div>
+                    </div>
+                `;
+                
+                responseLog.insertBefore(responseItem, responseLog.firstChild);
+                
+                // Auto-scroll to top
+                responseLog.scrollTop = 0;
             }
             
             // Show a temporary alert
@@ -745,6 +905,7 @@ https://discord.com/api/webhooks/..."></textarea>
                 alert.style.zIndex = '1000';
                 alert.style.maxWidth = '400px';
                 alert.style.boxShadow = '0 4px 12px rgba(0,0,0,0.3)';
+                alert.style.animation = 'slideUp 0.3s ease-out';
                 
                 alert.innerHTML = `
                     <div class="response-content">
@@ -766,10 +927,6 @@ https://discord.com/api/webhooks/..."></textarea>
             
             // Check and handle empty states
             function checkEmptyStates() {
-                // Remove any existing empty states
-                const existingEmptyStates = document.querySelectorAll('.empty-state');
-                existingEmptyStates.forEach(el => el.remove());
-                
                 // Check webhooks
                 if (webhooks.length === 0) {
                     const emptyState = document.createElement('div');
@@ -779,6 +936,13 @@ https://discord.com/api/webhooks/..."></textarea>
                         <h3>No webhooks saved</h3>
                         <p>Add your first webhook using the form above</p>
                     `;
+                    
+                    // Remove existing empty state if it exists
+                    const existingEmpty = webhookList.querySelector('.empty-state');
+                    if (existingEmpty) {
+                        webhookList.removeChild(existingEmpty);
+                    }
+                    
                     webhookList.appendChild(emptyState);
                 }
             }
@@ -786,6 +950,8 @@ https://discord.com/api/webhooks/..."></textarea>
             // Event listeners
             addWebhookBtn.addEventListener('click', addWebhooks);
             sendMessageBtn.addEventListener('click', sendMessage);
+            copyAllBtn.addEventListener('click', copyAllWebhooks);
+            deleteAllBtn.addEventListener('click', deleteAllWebhooks);
             
             selectAllBtn.addEventListener('click', function() {
                 Array.from(selectedWebhooksSelect.options).forEach(option => {
